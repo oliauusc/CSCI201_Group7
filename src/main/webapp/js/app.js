@@ -33,8 +33,35 @@ document.addEventListener('DOMContentLoaded', () => {
     loadPlaces();
     setupEventListeners();
     animatePlaceCards();
-    checkLoginStatus(); // Check if user is already logged in
+    updateUIForLoginStatus(); // Update UI based on server-side login status
 });
+
+// Update UI based on login status set by JSP
+function updateUIForLoginStatus() {
+    const loginBtn = document.getElementById('loginBtn');
+    const writeReviewBtn = document.getElementById('writeReviewBtn');
+    
+    if (window.isLoggedIn) {
+        // User is logged in - button is already "Logout" from JSP
+        console.log('User is logged in:', window.currentUser);
+        if (writeReviewBtn) {
+            writeReviewBtn.disabled = false;
+            writeReviewBtn.style.opacity = '1';
+            writeReviewBtn.style.cursor = 'pointer';
+        }
+    } else {
+        // User is not logged in - button is already "Login" from JSP
+        console.log('User is not logged in');
+        if (writeReviewBtn) {
+            writeReviewBtn.disabled = true;
+            writeReviewBtn.title = 'Please login to write a review';
+            writeReviewBtn.style.opacity = '0.5';
+            writeReviewBtn.style.cursor = 'not-allowed';
+        }
+    }
+}
+
+// Remove old checkLoginStatus function - no longer needed
 
 // Static Map Initialization
 function initStaticMap() {
@@ -722,171 +749,6 @@ function getDirections() {
     window.open(url, '_blank');
 }
 
-// Login/Register Functions
-function showLoginModal() {
-    const modal = document.getElementById('loginModal');
-    showLoginForm();
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function showLoginForm() {
-    document.getElementById('loginContainer').style.display = 'block';
-    document.getElementById('registerContainer').style.display = 'none';
-    document.getElementById('loginForm').reset();
-}
-
-function showRegisterForm() {
-    document.getElementById('loginContainer').style.display = 'none';
-    document.getElementById('registerContainer').style.display = 'block';
-    document.getElementById('registerForm').reset();
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const username = formData.get('username');
-    const password = formData.get('password');
-    const rememberMe = formData.get('rememberMe') === 'on';
-    
-    try {
-        showLoading(true);
-        
-        // Mock API call - replace with actual endpoint
-        const loginData = { username, password, rememberMe };
-        
-        // const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(loginData)
-        // });
-        // const data = await response.json();
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock successful login
-        const mockUser = {
-            userID: 1,
-            username: username,
-            firstName: 'John',
-            lastName: 'Doe'
-        };
-        
-        // Store user in sessionStorage
-        sessionStorage.setItem('user', JSON.stringify(mockUser));
-        
-        showLoading(false);
-        closeModal('loginModal');
-        
-        // Update UI to show logged in state
-        updateLoginButton(mockUser);
-        
-        alert('Login successful!');
-    } catch (error) {
-        console.error('Error logging in:', error);
-        showLoading(false);
-        alert('Login failed. Please try again.');
-    }
-}
-
-async function handleRegister(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const firstName = formData.get('firstName');
-    const lastName = formData.get('lastName');
-    const email = formData.get('email');
-    const username = formData.get('username');
-    const password = formData.get('password');
-    const confirmPassword = formData.get('confirmPassword');
-    
-    // Validate passwords match
-    if (password !== confirmPassword) {
-        alert('Passwords do not match!');
-        return;
-    }
-    
-    // Validate password length
-    if (password.length < 8) {
-        alert('Password must be at least 8 characters long!');
-        return;
-    }
-    
-    try {
-        showLoading(true);
-        
-        // Mock API call - replace with actual endpoint
-        const registerData = { firstName, lastName, email, username, password };
-        
-        // const response = await fetch(`${CONFIG.API_BASE_URL}/auth/register`, {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(registerData)
-        // });
-        // const data = await response.json();
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        showLoading(false);
-        
-        // Show success and switch to login
-        alert('Registration successful! Please log in.');
-        showLoginForm();
-    } catch (error) {
-        console.error('Error registering:', error);
-        showLoading(false);
-        alert('Registration failed. Please try again.');
-    }
-}
-
-function updateLoginButton(user) {
-    const loginBtn = document.getElementById('loginBtn');
-    
-    if (user) {
-        loginBtn.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-            </svg>
-            ${user.firstName || user.username}
-        `;
-        
-        // Update click handler to show profile/logout
-        loginBtn.onclick = () => {
-            const action = confirm('Log out?');
-            if (action) {
-                logout();
-            }
-        };
-    } else {
-        loginBtn.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-            </svg>
-            Login
-        `;
-        loginBtn.onclick = showLoginModal;
-    }
-}
-
-function logout() {
-    sessionStorage.removeItem('user');
-    updateLoginButton(null);
-    alert('Logged out successfully!');
-}
-
-function checkLoginStatus() {
-    const userStr = sessionStorage.getItem('user');
-    if (userStr) {
-        const user = JSON.parse(userStr);
-        updateLoginButton(user);
-    }
-}
-
 // Utility functions
 function formatDate(date) {
     const now = new Date();
@@ -938,9 +800,6 @@ function setupEventListeners() {
     // Locate button
     document.getElementById('locateBtn').addEventListener('click', getUserLocation);
     
-    // Login button
-    document.getElementById('loginBtn').addEventListener('click', showLoginModal);
-    
     // Sort select
     document.getElementById('sortSelect').addEventListener('change', (e) => {
         const sortBy = e.target.value;
@@ -970,6 +829,10 @@ function setupEventListeners() {
         showReviewsModal();
     });
     document.getElementById('writeReviewBtn').addEventListener('click', () => {
+        if (!window.currentUser) {
+            alert('Please login to write a review');
+            return;
+        }
         closeModal('locationModal');
         showWriteReviewModal();
     });

@@ -1,3 +1,11 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<%
+    // Check if user is logged in
+    String username = (String) session.getAttribute("username");
+    Integer userId = (Integer) session.getAttribute("userId");
+    boolean isLoggedIn = (username != null && userId != null);
+%>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +17,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        // Pass login status to JavaScript
+        window.isLoggedIn = <%= isLoggedIn %>;
+        window.currentUser = <%= isLoggedIn ? "{username: '" + username + "', userId: " + userId + "}" : "null" %>;
+    </script>
 </head>
 <body>
     <!-- Header -->
@@ -25,13 +38,23 @@
             <nav class="nav">
                 <button class="nav-btn active" data-view="map">Map</button>
                 <button class="nav-btn" data-view="list">List</button>
-                <button class="login-btn" id="loginBtn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                        <circle cx="12" cy="7" r="4"/>
-                    </svg>
-                    Login
-                </button>
+                <% if (isLoggedIn) { %>
+                    <a href="<%= request.getContextPath() %>/logout" class="login-btn" id="loginBtn" style="color: #ff6b6b;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        Logout
+                    </a>
+                <% } else { %>
+                    <a href="login.jsp" class="login-btn" id="loginBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        Login
+                    </a>
+                <% } %>
             </nav>
         </div>
     </header>
@@ -207,101 +230,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Login/Register Modal -->
-        <div class="modal" id="loginModal">
-            <div class="modal-overlay" id="loginModalOverlay"></div>
-            <div class="modal-content login-modal-content">
-                <button class="modal-close" id="loginModalClose">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
-                
-                <!-- Login Form -->
-                <div class="auth-container" id="loginContainer">
-                    <h2 class="modal-title">Welcome Back</h2>
-                    <p class="modal-subtitle">Sign in to your account</p>
-
-                    <form class="auth-form" id="loginForm">
-                        <div class="form-group">
-                            <label class="form-label" for="loginUsername">Username</label>
-                            <input type="text" id="loginUsername" name="username" class="form-input" placeholder="Enter your username" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="loginPassword">Password</label>
-                            <input type="password" id="loginPassword" name="password" class="form-input" placeholder="Enter your password" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="rememberMe" name="rememberMe">
-                                <span>Remember me</span>
-                            </label>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary btn-full">Sign In</button>
-                    </form>
-
-                    <div class="auth-divider">
-                        <span>Don't have an account?</span>
-                    </div>
-
-                    <button class="btn btn-secondary btn-full" id="showRegisterBtn">Create Account</button>
-                </div>
-
-                <!-- Register Form -->
-                <div class="auth-container" id="registerContainer" style="display: none;">
-                    <h2 class="modal-title">Create Account</h2>
-                    <p class="modal-subtitle">Join USC Food Finder</p>
-
-                    <form class="auth-form" id="registerForm">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label" for="registerFirstName">First Name</label>
-                                <input type="text" id="registerFirstName" name="firstName" class="form-input" placeholder="First name" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="registerLastName">Last Name</label>
-                                <input type="text" id="registerLastName" name="lastName" class="form-input" placeholder="Last name" required>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="registerEmail">Email</label>
-                            <input type="email" id="registerEmail" name="email" class="form-input" placeholder="you@usc.edu" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="registerUsername">Username</label>
-                            <input type="text" id="registerUsername" name="username" class="form-input" placeholder="Choose a username" required minlength="3">
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="registerPassword">Password</label>
-                            <input type="password" id="registerPassword" name="password" class="form-input" placeholder="Create a password" required minlength="8">
-                            <span class="form-hint">At least 8 characters</span>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="registerConfirmPassword">Confirm Password</label>
-                            <input type="password" id="registerConfirmPassword" name="confirmPassword" class="form-input" placeholder="Confirm your password" required>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary btn-full">Create Account</button>
-                    </form>
-
-                    <div class="auth-divider">
-                        <span>Already have an account?</span>
-                    </div>
-
-                    <button class="btn btn-secondary btn-full" id="showLoginBtn">Sign In</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Write Review Modal -->
         <div class="modal" id="writeReviewModal">
             <div class="modal-overlay" id="writeReviewModalOverlay"></div>
@@ -366,6 +294,7 @@
         <div class="spinner"></div>
     </div>
 
+    <script src="auth.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
