@@ -1,12 +1,18 @@
 package com.foodlocator.servlet;
 
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.*;
 import java.io.IOException;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 
 import com.foodlocator.util.DatabaseConnection;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 @WebServlet("/login")
 public class LoginServlet extends HttpServlet {
@@ -31,11 +37,11 @@ public class LoginServlet extends HttpServlet {
                 HttpSession session = request.getSession();
                 session.setAttribute("userId", rs.getInt("id"));
                 session.setAttribute("username", rs.getString("username"));
-                response.sendRedirect("index.jsp");
+                response.sendRedirect(request.getContextPath() + "/");
             } else {
                 // Login failed - forward with error message
                 request.setAttribute("loginError", "Invalid username or password");
-                request.getRequestDispatcher("loginSignup.jsp").forward(request, response);
+                request.getRequestDispatcher("jsp/login.jsp").forward(request, response);
             }
 
         } catch (Exception e) {

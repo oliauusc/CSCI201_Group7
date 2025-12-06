@@ -12,7 +12,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>USC Food Finder</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/styles.css">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,7 +47,7 @@
                         Logout
                     </a>
                 <% } else { %>
-                    <a href="login.jsp" class="login-btn" id="loginBtn">
+                    <a href="${pageContext.request.contextPath}/jsp/login.jsp" class="login-btn" id="loginBtn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                             <circle cx="12" cy="7" r="4"/>
@@ -294,7 +294,7 @@
         <div class="spinner"></div>
     </div>
 
-    <script src="auth.js"></script>
-    <script src="app.js"></script>
+    <script src="${pageContext.request.contextPath}/js/auth.js"></script>
+    <script src="${pageContext.request.contextPath}/js/app.js"></script>
 </body>
 </html>

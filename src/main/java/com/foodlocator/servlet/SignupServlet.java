@@ -1,12 +1,19 @@
 package com.foodlocator.servlet;
 
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.*;
 import java.io.IOException;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 
 import com.foodlocator.util.DatabaseConnection;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 @WebServlet("/signup")
 public class SignupServlet extends HttpServlet {
@@ -24,13 +31,13 @@ public class SignupServlet extends HttpServlet {
         if (email == null || username == null || password == null || confirm == null ||
             email.isEmpty() || username.isEmpty() || password.isEmpty() || confirm.isEmpty()) {
             request.setAttribute("signupError", "All fields must be filled.");
-            request.getRequestDispatcher("loginSignup.jsp").forward(request, response);
+            request.getRequestDispatcher("jsp/signup.jsp").forward(request, response);
             return;
         }
 
         if (!password.equals(confirm)) {
             request.setAttribute("signupError", "Passwords do not match.");
-            request.getRequestDispatcher("loginSignup.jsp").forward(request, response);
+            request.getRequestDispatcher("jsp/signup.jsp").forward(request, response);
             return;
         }
 
@@ -45,7 +52,7 @@ public class SignupServlet extends HttpServlet {
 
             if (rs1.next()) {
                 request.setAttribute("signupError", "Email already exists.");
-                request.getRequestDispatcher("loginSignup.jsp").forward(request, response);
+                request.getRequestDispatcher("jsp/signup.jsp").forward(request, response);
                 return;
             }
 
@@ -58,7 +65,7 @@ public class SignupServlet extends HttpServlet {
 
             if (rs2.next()) {
                 request.setAttribute("signupError", "Username already exists.");
-                request.getRequestDispatcher("loginSignup.jsp").forward(request, response);
+                request.getRequestDispatcher("jsp/signup.jsp").forward(request, response);
                 return;
             }
 
@@ -81,7 +88,7 @@ public class SignupServlet extends HttpServlet {
             session.setAttribute("userId", userId);
             session.setAttribute("username", username);
 
-            response.sendRedirect("index.jsp");
+            response.sendRedirect(request.getContextPath() + "/");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -89,7 +96,7 @@ public class SignupServlet extends HttpServlet {
             e.printStackTrace(System.err);
             request.setAttribute("signupError", "Signup failed: " + e.getMessage());
             try {
-                request.getRequestDispatcher("loginSignup.jsp").forward(request, response);
+                request.getRequestDispatcher("jsp/signup.jsp").forward(request, response);
             } catch (Exception e2) {
                 e2.printStackTrace();
             }

@@ -225,7 +225,7 @@ body {
     flex: 1;
     background: var(--bg-elevated);
     position: relative;
-    background-image: url('usc-map.png');
+    background-image: url('/foodlocator/usc-map.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

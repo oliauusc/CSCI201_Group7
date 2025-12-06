@@ -10,4 +10,9 @@
     <!-- Enable servlet 3.0 annotations -->
     <metadata-complete>false</metadata-complete>
 
+    <!-- Welcome files -->
+    <welcome-file-list>
+        <welcome-file>jsp/index.jsp</welcome-file>
+    </welcome-file-list>
+
 </web-app>
