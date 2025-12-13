@@ -127,41 +127,41 @@ public class ReviewDAO {
         return reviews;
     }
     
-    /**
-     * Get all reviews by a specific user
-     * @param userID ID of the user
-     * @return List of reviews by that user
-     */
-    public List<Review> getReviewsByUser(int userID) {
-        List<Review> reviews = new ArrayList<>();
-        String sql = "SELECT * FROM Reviews WHERE userID = ? ORDER BY createdAt DESC";
+    // /**
+    //  * Get all reviews by a specific user
+    //  * @param userID ID of the user
+    //  * @return List of reviews by that user
+    //  */
+    // public List<Review> getReviewsByUser(int userID) {
+    //     List<Review> reviews = new ArrayList<>();
+    //     String sql = "SELECT * FROM Reviews WHERE userID = ? ORDER BY createdAt DESC";
         
-        try (Connection conn = dbConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+    //     try (Connection conn = dbConnection.getConnection();
+    //          PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            pstmt.setInt(1, userID);
+    //         pstmt.setInt(1, userID);
             
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    reviews.add(new Review(
-                        rs.getInt("reviewID"),
-                        rs.getInt("locationID"),
-                        rs.getInt("userID"),
-                        rs.getDouble("rating"),
-                        rs.getString("title"),
-                        rs.getString("body"),
-                        rs.getTimestamp("createdAt")
-                    ));
-                }
-            }
+    //         try (ResultSet rs = pstmt.executeQuery()) {
+    //             while (rs.next()) {
+    //                 reviews.add(new Review(
+    //                     rs.getInt("reviewID"),
+    //                     rs.getInt("locationID"),
+    //                     rs.getInt("userID"),
+    //                     rs.getDouble("rating"),
+    //                     rs.getString("title"),
+    //                     rs.getString("body"),
+    //                     rs.getTimestamp("createdAt")
+    //                 ));
+    //             }
+    //         }
             
-        } catch (SQLException e) {
-            System.err.println("Error getting reviews by user: " + e.getMessage());
-            e.printStackTrace();
-        }
+    //     } catch (SQLException e) {
+    //         System.err.println("Error getting reviews by user: " + e.getMessage());
+    //         e.printStackTrace();
+    //     }
         
-        return reviews;
-    }
+    //     return reviews;
+    // }
     
     /**
      * Get top N reviews for a location (sorted by rating)
@@ -366,4 +366,60 @@ public class ReviewDAO {
         
         return reviews;
     }
+
+    public void updateLocationRating(int locationID) {
+        String query = "UPDATE Location SET rating = " +
+                    "(SELECT AVG(rating) FROM Review WHERE locationID = ? AND isVisible = 1) " +
+                    "WHERE locationID = ?";
+        
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+            PreparedStatement ps = conn.prepareStatement(query)) {
+            
+            ps.setInt(1, locationID);
+            ps.setInt(2, locationID);
+            ps.executeUpdate();
+            
+        } catch (SQLException e) {
+            System.err.println("Error updating location rating: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public List<Review> getReviewsByUser(int userID) {
+        List<Review> reviews = new ArrayList<>();
+        String query = "SELECT r.*, l.name as locationName " +
+                    "FROM Reviews r " +
+                    "JOIN Locations l ON r.locationID = l.locationID " +
+                    "WHERE r.userID = ? " +
+                    "ORDER BY r.createdAt DESC";
+        
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+            PreparedStatement ps = conn.prepareStatement(query)) {
+            
+            ps.setInt(1, userID);
+            ResultSet rs = ps.executeQuery();
+            
+            while (rs.next()) {
+                Review review = new Review(
+                    rs.getInt("locationID"),
+                    rs.getInt("userID"),
+                    rs.getDouble("rating"),
+                    rs.getString("title"),
+                    rs.getString("body")
+                );
+                review.setReviewID(rs.getInt("reviewID"));
+                review.setCreatedAt(rs.getTimestamp("createdAt"));
+                review.setLocationName(rs.getString("locationName"));
+                reviews.add(review);
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Error getting reviews by user: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return reviews;
+    }
+
+    
 }

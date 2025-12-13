@@ -57,6 +57,14 @@ public class ReviewServlet extends HttpServlet {
             
             // Parse path: /123 or /123/top
             String[] pathParts = pathInfo.substring(1).split("/");
+
+            // NEW: Check if path is /user/{userId}
+            if ("user".equals(pathParts[0]) && pathParts.length > 1) {
+                int userId = Integer.parseInt(pathParts[1]);
+                getUserReviews(userId, response, out);
+                return;
+            }
+
             int locationId = Integer.parseInt(pathParts[0]);
             
             if (pathParts.length > 1 && "top".equals(pathParts[1])) {
@@ -76,6 +84,41 @@ public class ReviewServlet extends HttpServlet {
         }
     }
     
+
+
+// NEW METHOD: Get all reviews by a specific user
+private void getUserReviews(int userId, HttpServletResponse response, PrintWriter out) {
+    try {
+        List<Review> reviews = reviewDAO.getReviewsByUser(userId);
+        
+        // Transform reviews to include location name
+        List<Map<String, Object>> transformedReviews = reviews.stream().map(review -> {
+            Map<String, Object> reviewMap = new HashMap<>();
+            
+            reviewMap.put("id", review.getReviewID());
+            reviewMap.put("locationID", review.getLocationID());
+            reviewMap.put("locationName", review.getLocationName()); // Assuming you add this field
+            reviewMap.put("rating", review.getRating());
+            reviewMap.put("title", review.getTitle());
+            reviewMap.put("body", review.getBody());
+            reviewMap.put("createdAt", review.getCreatedAt().toString());
+            
+            return reviewMap;
+        }).collect(Collectors.toList());
+        
+        Map<String, Object> jsonResponse = new HashMap<>();
+        jsonResponse.put("success", true);
+        jsonResponse.put("data", transformedReviews);
+        
+        out.print(gson.toJson(jsonResponse));
+        response.setStatus(HttpServletResponse.SC_OK);
+    } catch (Exception e) {
+        System.err.println("Error getting user reviews: " + e.getMessage());
+        e.printStackTrace();
+        sendErrorResponse(response, out, "Error retrieving user reviews", HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    }
+}
+
     private void getTopReviews(int locationId, HttpServletResponse response, PrintWriter out) {
         try {
             List<Review> reviews = reviewDAO.getTopReviewsByLocation(locationId, 3);
@@ -247,6 +290,9 @@ public class ReviewServlet extends HttpServlet {
             boolean created = reviewDAO.createReview(newReview);
             
             if (created) {
+                // UPDATE: Recalculate and update location rating
+                reviewDAO.updateLocationRating(locationID);
+                
                 Map<String, Object> responseData = new HashMap<>();
                 responseData.put("success", true);
                 responseData.put("message", "Review created successfully");
@@ -281,4 +327,7 @@ public class ReviewServlet extends HttpServlet {
         out.print(gson.toJson(errorResponse));
         response.setStatus(status);
     }
+
+ 
 }
+

@@ -24,7 +24,7 @@
     </script>
 </head>
 <body>
-    <!-- Header -->
+       <!-- Header -->
     <header class="header">
         <div class="header-content">
             <div class="logo">
@@ -37,7 +37,9 @@
             </div>
             <nav class="nav">
                 <button class="nav-btn active" data-view="map">Map</button>
-                <button class="nav-btn" data-view="list">List</button>
+                <% if (isLoggedIn) { %>
+                    <button class="nav-btn" data-view="my-reviews">My Reviews</button>
+                <% } %>
                 <% if (isLoggedIn) { %>
                     <a href="<%= request.getContextPath() %>/logout" class="login-btn" id="loginBtn" style="color: #ff6b6b;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -73,6 +75,8 @@
                 </svg>
                 <span>Locate Me</span>
             </button>
+
+            
             
             <!-- Nearby Sidebar -->
             <aside class="nearby-sidebar">

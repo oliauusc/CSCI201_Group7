@@ -12,6 +12,9 @@ const CONFIG = {
     API_BASE_URL: '/foodlocator/api'
 };
 
+// Add this variable at the top of app.js with other declarations
+let currentUserPosition = null;
+
 let mapContainer;
 let currentLocation = null;
 let allPlaces = [];
@@ -20,6 +23,8 @@ let currentReviews = [];
 let currentPage = 1;
 let totalReviews = 0;
 let totalPages = 1;
+
+console.log('mapContainer:', mapContainer);
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -71,6 +76,40 @@ async function loadPlaces() {
     }
 }
 
+function expandMapBounds(userLat, userLng) {
+    // Check if user is outside current bounds
+    const isOutside = userLat > CONFIG.MAP_BOUNDS.north || 
+                      userLat < CONFIG.MAP_BOUNDS.south ||
+                      userLng < CONFIG.MAP_BOUNDS.west ||
+                      userLng > CONFIG.MAP_BOUNDS.east;
+    
+    if (isOutside) {
+        // Expand bounds to include user location with padding
+        const padding = 0.01; // ~0.6 miles padding
+        
+        CONFIG.MAP_BOUNDS.north = Math.max(CONFIG.MAP_BOUNDS.north, userLat + padding);
+        CONFIG.MAP_BOUNDS.south = Math.min(CONFIG.MAP_BOUNDS.south, userLat - padding);
+        CONFIG.MAP_BOUNDS.east = Math.max(CONFIG.MAP_BOUNDS.east, userLng + padding);
+        CONFIG.MAP_BOUNDS.west = Math.min(CONFIG.MAP_BOUNDS.west, userLng - padding);
+        
+        // Redraw all markers with new bounds
+        redrawAllMarkers();
+    }
+}
+
+function redrawAllMarkers() {
+    // Clear existing markers
+    clearPlaceMarkers();
+    
+    // Re-add place markers with new coordinate system
+    addPlaceMarkers(allPlaces);
+    
+    // Re-add user marker if it exists
+    if (currentUserPosition) {
+        addUserMarker(currentUserPosition);
+    }
+}
+
 // Display places in sidebar
 function displayPlaces(places) {
     const placesList = document.getElementById('placesList');
@@ -86,6 +125,7 @@ function displayPlaces(places) {
                 </div>
             </div>
             <p class="place-description">${place.description}</p>
+            ${place.distance !== undefined ? `<p class="place-distance" style="font-size: 12px; color: #666; margin-top: 4px;">📍 ${place.distance} mi</p>` : ''}
         </div>
     `).join('');
     
@@ -280,41 +320,197 @@ function setupEventListeners() {
     const locateBtn = document.getElementById('locateBtn');
     if (locateBtn) {
         locateBtn.addEventListener('click', locateMe);
+        console.log('Locate Me button listener attached'); // Debug log
+    } else {
+        console.error('locateBtn element not found!'); // Debug log
+    }
+
+    // My Reviews button
+    const navBtns = document.querySelectorAll('.nav-btn');
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            navBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const view = btn.dataset.view;
+            if (view === 'my-reviews') {
+                showMyReviewsModal();
+            }
+        });
+    });
+}
+
+async function showMyReviewsModal() {
+    if (!window.currentUser) {
+        alert('Please login to view your reviews');
+        return;
+    }
+    
+    try {
+        showLoading(true);
+        
+        // Fetch user's reviews from all locations
+        const response = await fetch(
+            `${CONFIG.API_BASE_URL}/reviews/user/${window.currentUser.userId}`,
+            { credentials: 'include' }
+        );
+        const result = await response.json();
+        
+        showLoading(false);
+        
+        if (result.success) {
+            displayMyReviews(result.data);
+        } else {
+            showError('Failed to load your reviews');
+        }
+    } catch (error) {
+        showLoading(false);
+        console.error('Error loading user reviews:', error);
+        showError('Error loading your reviews');
     }
 }
 
+function displayMyReviews(reviews) {
+    // Open reviews modal with user's reviews
+    document.getElementById('reviewsModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('reviewsLocationName').textContent = 'My Reviews';
+    document.getElementById('reviewsRating').textContent = '';
+    document.getElementById('reviewsStars').innerHTML = '';
+    document.getElementById('reviewsCount').textContent = `${reviews.length} review${reviews.length !== 1 ? 's' : ''}`;
+    
+    // Hide sort controls for my reviews
+    document.getElementById('reviewsSortSelect').style.display = 'none';
+    
+    const container = document.getElementById('reviewsList');
+    if (!container) return;
+    
+    if (reviews.length === 0) {
+        container.innerHTML = '<p class="empty-message">You haven\'t written any reviews yet</p>';
+        return;
+    }
+    
+    container.innerHTML = reviews.map(r => `
+        <div class="review-card">
+            <div class="review-header">
+                <div>
+                    <strong>${r.locationName || 'Unknown Location'}</strong>
+                    <small>${formatDate(r.createdAt)}</small>
+                </div>
+                <div>${generateStars(r.rating)}</div>
+            </div>
+            <h4>${r.title}</h4>
+            <p>${r.body}</p>
+        </div>
+    `).join('');
+    
+    // Hide pagination for my reviews
+    document.getElementById('reviewsPagination').style.display = 'none';
+}
+
 function locateMe() {
-    if (navigator.geolocation) {
+    if ('geolocation' in navigator) {
+        showLoading(true);
+        
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
-                const userLat = latitude;
-                const userLng = longitude;
+                currentUserPosition = [latitude, longitude];
                 
-                // Find nearest location
-                if (allPlaces.length > 0) {
-                    let nearest = allPlaces[0];
-                    let minDist = Math.sqrt(Math.pow(nearest.lat - userLat, 2) + Math.pow(nearest.lng - userLng, 2));
-                    
-                    allPlaces.forEach(place => {
-                        const dist = Math.sqrt(Math.pow(place.lat - userLat, 2) + Math.pow(place.lng - userLng, 2));
-                        if (dist < minDist) {
-                            minDist = dist;
-                            nearest = place;
-                        }
-                    });
-                    
-                    showLocationModal(nearest);
+                // DON'T expand bounds - just add marker
+                addUserMarker(currentUserPosition);
+                
+                // Update distance indicator in sidebar
+                const indicator = document.getElementById('userDistanceIndicator');
+                if (indicator) {
+                    indicator.innerHTML = `
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                        </svg>
+                        <span>Your Location</span>
+                    `;
                 }
+                
+                // Recalculate distances and update places
+                updatePlacesDistances();
+                
+                showLoading(false);
             },
             (error) => {
                 console.error('Geolocation error:', error);
-                showError('Could not get your location');
+                showLoading(false);
+                showError('Unable to get your location. Using USC campus as default.');
             }
         );
     } else {
-        showError('Geolocation not supported');
+        showError('Geolocation is not supported by your browser.');
     }
+}
+
+function addUserMarker(position) {
+    const coords = latLngToPixel(position[0], position[1]);
+    
+    // Get map dimensions
+    const mapWidth = mapContainer.offsetWidth;
+    const mapHeight = mapContainer.offsetHeight;
+    
+    // Clamp coordinates to map boundaries (with small margin)
+    const margin = 10; // 10px from edge
+    const clampedX = Math.max(margin, Math.min(coords.x, mapWidth - margin));
+    const clampedY = Math.max(margin, Math.min(coords.y, mapHeight - margin));
+    
+    // Remove existing user marker if any
+    const existing = mapContainer.querySelector('.user-marker');
+    if (existing) existing.remove();
+    
+    const marker = document.createElement('div');
+    marker.className = 'user-marker';
+    marker.style.left = `${clampedX}px`;
+    marker.style.top = `${clampedY}px`;
+    marker.title = 'Your Location';
+    
+    // Optional: Add indicator if marker is clamped
+    const isClamped = clampedX !== coords.x || clampedY !== coords.y;
+    if (isClamped) {
+        marker.title = 'Your Location (outside map area)';
+        // You could add a visual indicator, like pulsing faster
+        marker.style.animation = 'pulse 1s infinite'; // Faster pulse
+    }
+    
+    mapContainer.appendChild(marker);
+}
+
+function updatePlacesDistances() {
+    allPlaces.forEach(place => {
+        place.distance = calculateDistance(
+            currentUserPosition[0],
+            currentUserPosition[1],
+            place.lat,
+            place.lng
+        );
+    });
+    
+    displayPlaces(allPlaces);
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 3959; // Earth's radius in miles
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+    
+    return Math.round(distance * 100) / 100;
+}
+
+function toRad(degrees) {
+    return degrees * (Math.PI / 180);
 }
 
 function getDirections(place) {
@@ -436,5 +632,34 @@ function handleNextPage() {
     if (currentPage < totalPages && currentLocation) {
         const sortBy = document.getElementById('reviewsSortSelect')?.value || 'recent';
         loadAllReviews(currentLocation.id, currentPage + 1, sortBy);
+    }
+}
+
+// In the write review success handler (wherever you handle the review submission response)
+async function handleReviewSubmitSuccess(locationId) {
+    // Reload the location to get updated rating
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/locations/${locationId}`, { 
+            credentials: 'include' 
+        });
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            // Update the location in allPlaces array
+            const placeIndex = allPlaces.findIndex(p => p.id == locationId);
+            if (placeIndex !== -1) {
+                allPlaces[placeIndex].rating = data.data.rating || data.data.averageRating;
+            }
+            
+            // Update current location if it's the same
+            if (currentLocation && currentLocation.id == locationId) {
+                currentLocation.rating = data.data.rating || data.data.averageRating;
+            }
+            
+            // Refresh the display
+            displayPlaces(allPlaces);
+        }
+    } catch (error) {
+        console.error('Error updating rating:', error);
     }
 }

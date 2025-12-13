@@ -214,6 +214,8 @@ body {
     position: relative;
 }
 
+
+
 /* Map View */
 .map-view {
     display: flex;
@@ -224,11 +226,12 @@ body {
 .map-canvas {
     flex: 1;
     background: var(--bg-elevated);
-    position: relative;
+    position: relative; /* ✅ Good */
     background-image: url('/foodlocator/usc-map.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+    overflow: visible; /* ADD THIS - prevents markers from being cut off */
 }
 
 .map-canvas::before {
@@ -240,6 +243,44 @@ body {
     bottom: 0;
     background: linear-gradient(to bottom, rgba(248, 249, 250, 0) 0%, rgba(248, 249, 250, 0.3) 100%);
     pointer-events: none;
+    z-index: 1; /* ADD THIS - keep gradient above map but below markers */
+}
+
+/* User marker - make sure z-index is higher than gradient */
+.user-marker {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: #457B9D;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 0 8px rgba(69, 123, 157, 0.2);
+    animation: pulse 2s infinite;
+    z-index: 100;
+    transform: translate(-50%, -50%);
+}
+
+/* Restaurant markers should also be above gradient */
+.map-marker {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background: var(--primary);
+    border: 3px solid white;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 50; /* Above gradient but below user marker */
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(69, 123, 157, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 12px rgba(69, 123, 157, 0);
+    }
 }
 
 /* Floating Locate Me Button */
@@ -274,79 +315,6 @@ body {
 
 .location-btn-floating svg {
     stroke-width: 2.5px;
-}
-
-/* Static map markers */
-.map-marker {
-    position: absolute;
-    width: 32px;
-    height: 32px;
-    cursor: pointer;
-    transition: all 0.2s;
-    z-index: 10;
-}
-
-.map-marker::before {
-    content: '';
-    position: absolute;
-    width: 32px;
-    height: 32px;
-    background: var(--primary);
-    border: 3px solid white;
-    border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg);
-    box-shadow: 0 4px 12px rgba(230, 57, 70, 0.4);
-    transition: all 0.2s;
-}
-
-.map-marker:hover {
-    transform: scale(1.15);
-    z-index: 20;
-}
-
-.map-marker:hover::before {
-    background: var(--primary-dark);
-    box-shadow: 0 6px 16px rgba(230, 57, 70, 0.6);
-}
-
-.user-marker {
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    background: var(--secondary);
-    border: 3px solid white;
-    border-radius: 50%;
-    box-shadow: 0 0 10px rgba(69, 123, 157, 0.5);
-    z-index: 15;
-}
-
-.user-marker::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 40px;
-    height: 40px;
-    border: 2px solid var(--secondary);
-    border-radius: 50%;
-    opacity: 0.3;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        transform: translate(-50%, -50%) scale(0.8);
-        opacity: 0.5;
-    }
-    50% {
-        transform: translate(-50%, -50%) scale(1.2);
-        opacity: 0.2;
-    }
-    100% {
-        transform: translate(-50%, -50%) scale(0.8);
-        opacity: 0.5;
-    }
 }
 
 /* Nearby Sidebar */

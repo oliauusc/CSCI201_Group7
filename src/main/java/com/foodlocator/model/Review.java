@@ -104,4 +104,14 @@ public class Review {
                 ", createdAt=" + createdAt +
                 '}';
     }
+
+    private String locationName; // Add this field
+
+    public String getLocationName() {
+        return locationName;
+    }
+
+    public void setLocationName(String locationName) {
+        this.locationName = locationName;
+    }
 }

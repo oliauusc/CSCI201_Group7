@@ -33,7 +33,7 @@ public class DatabaseConnection {
                 // Fallback to default values
                 this.url = "jdbc:mysql://localhost:3306/foodLocator";
                 this.username = "root";
-                this.password = "";
+                this.password = "Ol392403";
                 this.driver = "com.mysql.cj.jdbc.Driver";
             } else {
                 props.load(input);
