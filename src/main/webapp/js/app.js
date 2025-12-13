@@ -1,930 +1,440 @@
-// USC Food Locator Application
-// Main JavaScript file for static map interaction, modals, and review system
+// USC Food Locator - SIMPLIFIED VERSION
+// Only essential functionality, no dead code
 
-// Configuration
 const CONFIG = {
-    USC_CENTER: [34.0224, -118.2851], // USC campus coordinates
-    USC_VILLAGE: [34.0250, -118.2850], // USC Village coordinates
+    USC_CENTER: [34.0224, -118.2851],
     MAP_BOUNDS: {
         north: 34.0280,
         south: 34.0200,
         east: -118.2820,
         west: -118.2880
     },
-    API_BASE_URL: '/api', // Update this with your actual API endpoint
-    REVIEWS_PER_PAGE: 10
+    API_BASE_URL: '/foodlocator/api'
 };
 
-// Global state
 let mapContainer;
-let userMarker;
-let locationMarkers = [];
 let currentLocation = null;
-let currentUserPosition = CONFIG.USC_CENTER;
 let allPlaces = [];
+let locationMarkers = [];
 let currentReviews = [];
 let currentPage = 1;
+let totalReviews = 0;
 let totalPages = 1;
-let selectedTags = [];
 
-// Initialize the application
+// Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     initStaticMap();
     loadPlaces();
     setupEventListeners();
-    animatePlaceCards();
-    updateUIForLoginStatus(); // Update UI based on server-side login status
 });
 
-// Update UI based on login status set by JSP
-function updateUIForLoginStatus() {
-    const loginBtn = document.getElementById('loginBtn');
-    const writeReviewBtn = document.getElementById('writeReviewBtn');
-    
-    if (window.isLoggedIn) {
-        // User is logged in - button is already "Logout" from JSP
-        console.log('User is logged in:', window.currentUser);
-        if (writeReviewBtn) {
-            writeReviewBtn.disabled = false;
-            writeReviewBtn.style.opacity = '1';
-            writeReviewBtn.style.cursor = 'pointer';
-        }
-    } else {
-        // User is not logged in - button is already "Login" from JSP
-        console.log('User is not logged in');
-        if (writeReviewBtn) {
-            writeReviewBtn.disabled = true;
-            writeReviewBtn.title = 'Please login to write a review';
-            writeReviewBtn.style.opacity = '0.5';
-            writeReviewBtn.style.cursor = 'not-allowed';
-        }
-    }
-}
-
-// Remove old checkLoginStatus function - no longer needed
-
-// Static Map Initialization
+// Map initialization
 function initStaticMap() {
     mapContainer = document.getElementById('map');
-    
-    // Add user location marker
-    addUserMarker(currentUserPosition);
+    if (!mapContainer) console.error('Map container not found');
 }
 
-// Convert lat/lng to pixel coordinates on the static map
 function latLngToPixel(lat, lng) {
     const mapWidth = mapContainer.offsetWidth;
     const mapHeight = mapContainer.offsetHeight;
-    
-    // Calculate position as percentage of map bounds
     const x = ((lng - CONFIG.MAP_BOUNDS.west) / (CONFIG.MAP_BOUNDS.east - CONFIG.MAP_BOUNDS.west)) * mapWidth;
     const y = ((CONFIG.MAP_BOUNDS.north - lat) / (CONFIG.MAP_BOUNDS.north - CONFIG.MAP_BOUNDS.south)) * mapHeight;
-    
     return { x, y };
 }
 
-// Add user marker to static map
-function addUserMarker(position) {
-    const coords = latLngToPixel(position[0], position[1]);
-    
-    // Remove existing user marker if any
-    const existing = mapContainer.querySelector('.user-marker');
-    if (existing) existing.remove();
-    
-    const marker = document.createElement('div');
-    marker.className = 'user-marker';
-    marker.style.left = `${coords.x}px`;
-    marker.style.top = `${coords.y}px`;
-    marker.style.transform = 'translate(-50%, -50%)';
-    
-    mapContainer.appendChild(marker);
-    userMarker = marker;
-}
-
-// Add place marker to static map
-function addPlaceMarker(place) {
-    const coords = latLngToPixel(place.lat, place.lng);
-    
-    const marker = document.createElement('div');
-    marker.className = 'map-marker';
-    marker.style.left = `${coords.x}px`;
-    marker.style.top = `${coords.y}px`;
-    marker.style.transform = 'translate(-50%, -100%)'; // Center and align to bottom
-    marker.dataset.placeId = place.id;
-    marker.title = place.name;
-    
-    marker.addEventListener('click', () => showLocationModal(place));
-    
-    mapContainer.appendChild(marker);
-    locationMarkers.push(marker);
-}
-
-// Clear all place markers
-function clearPlaceMarkers() {
-    locationMarkers.forEach(marker => marker.remove());
-    locationMarkers = [];
-}
-
-// Load places from backend
+// Load places from API
 async function loadPlaces() {
     try {
         showLoading(true);
+        const response = await fetch(`${CONFIG.API_BASE_URL}/locations`, { credentials: 'include' });
+        const data = await response.json();
         
-        // Mock data for demonstration - replace with actual API call
-        // const response = await fetch(`${CONFIG.API_BASE_URL}/locations`);
-        // const data = await response.json();
-        
-        // Mock places data
-        allPlaces = generateMockPlaces();
-        
-        displayPlaces(allPlaces);
-        addPlaceMarkers(allPlaces);
-        
+        if (data.success && Array.isArray(data.data)) {
+            allPlaces = data.data.map(loc => ({
+                id: loc.locationID,
+                name: loc.name,
+                lat: loc.lat,
+                lng: loc.lng,
+                rating: loc.rating || 0,
+                description: loc.description || loc.category
+            }));
+            displayPlaces(allPlaces);
+            addPlaceMarkers(allPlaces);
+        } else {
+            showError('Failed to load locations');
+        }
         showLoading(false);
     } catch (error) {
         console.error('Error loading places:', error);
         showLoading(false);
-        showError('Failed to load locations. Please try again.');
+        showError('Error loading locations');
     }
-}
-
-// Generate mock places for demonstration
-function generateMockPlaces() {
-    const mockPlaces = [
-        {
-            id: 1,
-            name: 'Dulce',
-            lat: 34.0250,
-            lng: -118.2850,
-            rating: 4.2,
-            description: 'Quick bites • Desserts • Campus dining',
-            tags: ['quick', 'cheap'],
-            distance: 0.02
-        },
-        {
-            id: 2,
-            name: 'Everybody\'s Kitchen',
-            lat: 34.0245,
-            lng: -118.2855,
-            rating: 4.0,
-            description: 'International • Healthy options • Dining hall',
-            tags: ['healthy', 'vegan'],
-            distance: 0.8
-        },
-        {
-            id: 3,
-            name: 'Lemonade',
-            lat: 34.0265,
-            lng: -118.2845,
-            rating: 3.7,
-            description: 'Healthy • Fresh • Salads',
-            tags: ['healthy', 'vegan', 'quick'],
-            distance: 1.3
-        },
-        {
-            id: 4,
-            name: 'Seeds Marketplace',
-            lat: 34.0230,
-            lng: -118.2865,
-            rating: 4.5,
-            description: 'Quick service • Coffee • Sandwiches',
-            tags: ['quick', 'cheap'],
-            distance: 0.15
-        },
-        {
-            id: 5,
-            name: 'Popchew',
-            lat: 34.0240,
-            lng: -118.2840,
-            rating: 4.3,
-            description: 'Bubble tea • Snacks • Asian',
-            tags: ['quick', 'cheap'],
-            distance: 0.25
-        }
-    ];
-    
-    return mockPlaces;
 }
 
 // Display places in sidebar
 function displayPlaces(places) {
     const placesList = document.getElementById('placesList');
+    if (!placesList) return;
     
-    // Sort places by distance by default
-    const sortedPlaces = [...places].sort((a, b) => a.distance - b.distance);
-    
-    placesList.innerHTML = sortedPlaces.map((place, index) => `
-        <div class="place-card" data-place-id="${place.id}" style="animation-delay: ${index * 0.05}s;">
+    placesList.innerHTML = places.map((place, idx) => `
+        <div class="place-card" data-place-id="${place.id}">
             <div class="place-card-header">
-                <div>
-                    <h3 class="place-name">${place.name}</h3>
-                    <div class="place-rating">
-                        <div class="stars">
-                            ${generateStars(place.rating)}
-                        </div>
-                        <span class="rating-value">${place.rating.toFixed(1)}</span>
-                    </div>
+                <h3>${place.name}</h3>
+                <div class="place-rating">
+                    <span class="stars">${generateStars(place.rating)}</span>
+                    <span>${place.rating.toFixed(1)}</span>
                 </div>
-                <span class="place-distance">${place.distance} mi</span>
             </div>
-            <div class="place-tags">
-                ${place.tags.map(tag => `<span class="tag">${getTagIcon(tag)} ${tag}</span>`).join('')}
-            </div>
+            <p class="place-description">${place.description}</p>
         </div>
     `).join('');
     
-    // Add click listeners to place cards
+    // Add click listeners
     document.querySelectorAll('.place-card').forEach(card => {
         card.addEventListener('click', () => {
-            const placeId = parseInt(card.dataset.placeId);
-            const place = places.find(p => p.id === placeId);
-            showLocationModal(place);
+            const placeId = card.dataset.placeId;
+            const place = allPlaces.find(p => p.id == placeId);
+            if (place) showLocationModal(place);
         });
     });
 }
 
-// Add place markers to map
-function addPlaceMarkers(places) {
-    // Clear existing markers
-    clearPlaceMarkers();
+function sortPlaces(sortBy) {
+    const sorted = [...allPlaces];
+    const userLocation = CONFIG.USC_CENTER; // [34.0224, -118.2851]
     
+    if (sortBy === 'distance') {
+        // Sort by distance from USC Center
+        sorted.sort((a, b) => {
+            const distA = Math.sqrt(Math.pow(a.lat - userLocation[0], 2) + Math.pow(a.lng - userLocation[1], 2));
+            const distB = Math.sqrt(Math.pow(b.lat - userLocation[0], 2) + Math.pow(b.lng - userLocation[1], 2));
+            return distA - distB;
+        });
+    } else if (sortBy === 'rating') {
+        // Sort by rating (highest first)
+        sorted.sort((a, b) => b.rating - a.rating);
+    } else if (sortBy === 'popular') {
+        // Sort by number of reviews (popularity)
+        sorted.sort((a, b) => b.reviewCount - a.reviewCount);
+    }
+    
+    displayPlaces(sorted);
+}
+
+function generateStars(rating) {
+    const full = Math.floor(rating);
+    let html = '';
+    for (let i = 0; i < 5; i++) {
+        html += i < full ? '★' : '☆';
+    }
+    return html;
+}
+
+// Add markers to map
+function addPlaceMarkers(places) {
+    clearPlaceMarkers();
     places.forEach(place => {
-        addPlaceMarker(place);
+        const coords = latLngToPixel(place.lat, place.lng);
+        const marker = document.createElement('div');
+        marker.className = 'map-marker';
+        marker.style.left = `${coords.x}px`;
+        marker.style.top = `${coords.y}px`;
+        marker.title = place.name;
+        marker.addEventListener('click', () => showLocationModal(place));
+        mapContainer.appendChild(marker);
+        locationMarkers.push(marker);
     });
 }
 
-// Generate star rating HTML
-function generateStars(rating) {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    
-    let starsHtml = '';
-    for (let i = 0; i < fullStars; i++) {
-        starsHtml += '<span class="star">★</span>';
-    }
-    if (hasHalfStar) {
-        starsHtml += '<span class="star">★</span>';
-    }
-    for (let i = 0; i < emptyStars; i++) {
-        starsHtml += '<span class="star empty">★</span>';
-    }
-    
-    return starsHtml;
-}
-
-// Get tag icon
-function getTagIcon(tag) {
-    const icons = {
-        'vegan': '🌱',
-        'cheap': '💰',
-        'quick': '⚡',
-        'healthy': '🥗',
-        'spicy': '🌶️',
-        'late-night': '🌙'
-    };
-    return icons[tag] || '•';
+function clearPlaceMarkers() {
+    locationMarkers.forEach(m => m.remove());
+    locationMarkers = [];
 }
 
 // Show location modal
 function showLocationModal(place) {
     currentLocation = place;
-    const modal = document.getElementById('locationModal');
-    
-    // Update modal content
     document.getElementById('locationName').textContent = place.name;
     document.getElementById('locationRating').textContent = place.rating.toFixed(1);
-    document.getElementById('locationStars').innerHTML = generateStars(place.rating);
-    document.getElementById('locationDistance').textContent = `${place.distance} miles`;
     document.getElementById('locationDescription').textContent = place.description;
-    
-    // Set location image (placeholder)
-    const locationImage = document.getElementById('locationImage');
-    locationImage.innerHTML = getPlaceEmoji(place.name);
-    
-    // Load and display top reviews
-    loadTopReviews(place.id);
-    
-    modal.classList.add('active');
+    document.getElementById('locationModal').classList.add('active');
     document.body.style.overflow = 'hidden';
+    loadTopReviews(place.id);
 }
 
-// Get place emoji based on name/type
-function getPlaceEmoji(name) {
-    const emojis = {
-        'dulce': '🍰',
-        'kitchen': '🍽️',
-        'lemonade': '🥗',
-        'seeds': '☕',
-        'popchew': '🧋'
-    };
-    
-    const key = Object.keys(emojis).find(k => name.toLowerCase().includes(k));
-    return emojis[key] || '🍴';
-}
-
-// Load top reviews for a location
+// Load top 3 reviews
 async function loadTopReviews(locationId) {
     try {
-        // Mock reviews - replace with actual API call
-        // const response = await fetch(`${CONFIG.API_BASE_URL}/reviews/${locationId}/top`);
-        // const reviews = await response.json();
-        
-        const reviews = generateMockReviews(locationId, 3);
+        const response = await fetch(`${CONFIG.API_BASE_URL}/reviews/${locationId}/top`, { credentials: 'include' });
+        const result = await response.json();
+        const reviews = result.success && result.data ? result.data : [];
         displayTopReviews(reviews);
     } catch (error) {
         console.error('Error loading reviews:', error);
+        displayTopReviews([]);
     }
 }
 
-// Generate mock reviews
-function generateMockReviews(locationId, count = 10) {
-    const authors = ['Sarah K.', 'Mike T.', 'Emma L.', 'John D.', 'Lisa W.', 'Chris P.', 'Amy R.', 'David M.'];
-    const titles = [
-        'Great food and quick service!',
-        'Perfect spot for lunch',
-        'Could be better',
-        'Amazing experience',
-        'Decent but overpriced',
-        'Hidden gem on campus',
-        'Not worth the hype',
-        'My go-to spot'
-    ];
-    const bodies = [
-        'The food here is consistently good. I come here at least twice a week and have never been disappointed.',
-        'Quick service and great taste. Perfect for when you\'re in a hurry between classes.',
-        'It\'s okay, nothing special. The portions could be bigger for the price.',
-        'Absolutely love this place! The atmosphere is great and the food is even better.',
-        'Food is decent but a bit overpriced for what you get. Still worth trying though.',
-        'This has become my favorite spot on campus. The staff is friendly and the food is always fresh.',
-        'I had high expectations based on reviews but was somewhat disappointed. Maybe I ordered the wrong thing.',
-        'Can\'t get enough of this place. The variety is great and everything I\'ve tried has been delicious.'
-    ];
-    const tags = [['vegan', 'healthy'], ['quick', 'cheap'], ['spicy'], ['healthy'], ['vegan'], ['late-night', 'cheap']];
-    
-    const reviews = [];
-    for (let i = 0; i < count; i++) {
-        reviews.push({
-            id: i + 1,
-            locationId,
-            author: authors[Math.floor(Math.random() * authors.length)],
-            rating: Math.random() * 2 + 3, // 3-5 stars
-            title: titles[Math.floor(Math.random() * titles.length)],
-            body: bodies[Math.floor(Math.random() * bodies.length)],
-            tags: tags[Math.floor(Math.random() * tags.length)],
-            createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Random date within last 30 days
-            helpfulCount: Math.floor(Math.random() * 50)
-        });
-    }
-    
-    return reviews.sort((a, b) => b.rating - a.rating);
-}
-
-// Display top reviews in location modal
 function displayTopReviews(reviews) {
-    const topReviewsContainer = document.getElementById('topReviews');
-    const reviewsHtml = reviews.map(review => `
-        <div class="review-preview">
-            <div class="review-header">
-                <span class="review-author">${review.author}</span>
-                <span class="review-date">${formatDate(review.createdAt)}</span>
-            </div>
-            <div class="review-rating">
-                ${generateStars(review.rating)}
-            </div>
-            <h4 class="review-title">${review.title}</h4>
-            <p class="review-body">${truncateText(review.body, 120)}</p>
-        </div>
-    `).join('');
+    const container = document.getElementById('topReviews');
+    if (!container) return;
     
-    topReviewsContainer.innerHTML = `
-        <h3 class="section-title">Top Reviews</h3>
-        ${reviewsHtml}
-    `;
-}
-
-// Show all reviews modal
-function showReviewsModal() {
-    if (!currentLocation) return;
-    
-    const modal = document.getElementById('reviewsModal');
-    document.getElementById('reviewsLocationName').textContent = currentLocation.name;
-    document.getElementById('reviewsRating').textContent = currentLocation.rating.toFixed(1);
-    document.getElementById('reviewsStars').innerHTML = generateStars(currentLocation.rating);
-    
-    // Load all reviews
-    loadAllReviews(currentLocation.id);
-    
-    // Setup tag filters
-    setupTagFilters();
-    
-    modal.classList.add('active');
-}
-
-// Load all reviews with pagination
-async function loadAllReviews(locationId, page = 1, sortBy = 'recent', filters = []) {
-    try {
-        showLoading(true);
-        
-        // Mock reviews - replace with actual API call
-        const allReviews = generateMockReviews(locationId, 45);
-        
-        // Apply sorting
-        let sortedReviews = [...allReviews];
-        switch (sortBy) {
-            case 'rating-high':
-                sortedReviews.sort((a, b) => b.rating - a.rating);
-                break;
-            case 'rating-low':
-                sortedReviews.sort((a, b) => a.rating - b.rating);
-                break;
-            case 'helpful':
-                sortedReviews.sort((a, b) => b.helpfulCount - a.helpfulCount);
-                break;
-            default: // recent
-                sortedReviews.sort((a, b) => b.createdAt - a.createdAt);
-        }
-        
-        // Apply tag filters
-        if (filters.length > 0) {
-            sortedReviews = sortedReviews.filter(review =>
-                filters.some(tag => review.tags.includes(tag))
-            );
-        }
-        
-        currentReviews = sortedReviews;
-        totalPages = Math.ceil(sortedReviews.length / CONFIG.REVIEWS_PER_PAGE);
-        currentPage = page;
-        
-        // Get reviews for current page
-        const startIndex = (page - 1) * CONFIG.REVIEWS_PER_PAGE;
-        const endIndex = startIndex + CONFIG.REVIEWS_PER_PAGE;
-        const pageReviews = sortedReviews.slice(startIndex, endIndex);
-        
-        displayAllReviews(pageReviews);
-        updatePagination();
-        updateReviewsCount(sortedReviews.length);
-        
-        showLoading(false);
-    } catch (error) {
-        console.error('Error loading reviews:', error);
-        showLoading(false);
-    }
-}
-
-// Display all reviews
-function displayAllReviews(reviews) {
-    const reviewsList = document.getElementById('reviewsList');
-    
-    reviewsList.innerHTML = reviews.map(review => `
-        <div class="review-card">
-            <div class="review-card-header">
-                <div class="review-author-info">
-                    <div class="review-avatar">${review.author[0]}</div>
-                    <div class="review-author-details">
-                        <span class="review-author">${review.author}</span>
-                        <div class="review-meta">
-                            <span class="review-date">${formatDate(review.createdAt)}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="review-actions">
-                    <button class="helpful-btn" data-review-id="${review.id}">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
-                        </svg>
-                        <span>${review.helpfulCount}</span>
-                    </button>
-                </div>
-            </div>
-            <div class="review-rating">
-                ${generateStars(review.rating)}
-            </div>
-            ${review.tags.length > 0 ? `
-                <div class="review-tags">
-                    ${review.tags.map(tag => `<span class="review-tag">${getTagIcon(tag)} ${tag}</span>`).join('')}
-                </div>
-            ` : ''}
-            <h4 class="review-title">${review.title}</h4>
-            <p class="review-body">${review.body}</p>
-        </div>
-    `).join('');
-    
-    // Add helpful button listeners
-    document.querySelectorAll('.helpful-btn').forEach(btn => {
-        btn.addEventListener('click', handleHelpfulClick);
-    });
-}
-
-// Setup tag filters
-function setupTagFilters() {
-    const allTags = ['vegan', 'cheap', 'quick', 'healthy', 'spicy', 'late-night'];
-    const tagFiltersContainer = document.getElementById('tagFilters');
-    
-    tagFiltersContainer.innerHTML = allTags.map(tag => `
-        <button class="tag-filter" data-tag="${tag}">
-            ${getTagIcon(tag)} ${tag}
-        </button>
-    `).join('');
-    
-    // Add click listeners
-    document.querySelectorAll('.tag-filter').forEach(btn => {
-        btn.addEventListener('click', () => {
-            btn.classList.toggle('active');
-            const tag = btn.dataset.tag;
-            
-            if (selectedTags.includes(tag)) {
-                selectedTags = selectedTags.filter(t => t !== tag);
-            } else {
-                selectedTags.push(tag);
-            }
-            
-            // Reload reviews with filters
-            const sortBy = document.getElementById('reviewsSortSelect').value;
-            loadAllReviews(currentLocation.id, 1, sortBy, selectedTags);
-        });
-    });
-}
-
-// Handle helpful button click
-function handleHelpfulClick(e) {
-    const btn = e.currentTarget;
-    const reviewId = btn.dataset.reviewId;
-    
-    // Toggle active state
-    btn.classList.toggle('active');
-    
-    // Update count (mock - would be API call in production)
-    const countSpan = btn.querySelector('span');
-    let count = parseInt(countSpan.textContent);
-    count = btn.classList.contains('active') ? count + 1 : count - 1;
-    countSpan.textContent = count;
-    
-    // In production, send to API
-    // updateReviewHelpful(reviewId, btn.classList.contains('active'));
-}
-
-// Update pagination
-function updatePagination() {
-    document.getElementById('currentPage').textContent = currentPage;
-    document.getElementById('totalPages').textContent = totalPages;
-    
-    const prevBtn = document.getElementById('prevPage');
-    const nextBtn = document.getElementById('nextPage');
-    
-    prevBtn.disabled = currentPage === 1;
-    nextBtn.disabled = currentPage === totalPages;
-}
-
-// Update reviews count
-function updateReviewsCount(count) {
-    document.getElementById('reviewsCount').textContent = `${count} reviews`;
-}
-
-// Show write review modal
-function showWriteReviewModal() {
-    if (!currentLocation) return;
-    
-    const modal = document.getElementById('writeReviewModal');
-    document.getElementById('writeReviewLocationName').textContent = currentLocation.name;
-    
-    // Reset form
-    document.getElementById('reviewForm').reset();
-    resetStarInput();
-    resetTagInput();
-    
-    modal.classList.add('active');
-}
-
-// Reset star input
-function resetStarInput() {
-    document.querySelectorAll('.star-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    document.getElementById('ratingInput').value = '0';
-}
-
-// Reset tag input
-function resetTagInput() {
-    document.querySelectorAll('.tag-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-}
-
-// Handle review form submission
-async function handleReviewSubmit(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const rating = formData.get('rating');
-    const title = formData.get('title');
-    const body = formData.get('body');
-    
-    // Get selected tags
-    const tags = [];
-    document.querySelectorAll('.tag-btn.active').forEach(btn => {
-        tags.push(btn.dataset.tag);
-    });
-    
-    // Validate
-    if (rating === '0') {
-        alert('Please select a rating');
+    if (reviews.length === 0) {
+        container.innerHTML = '<p class="empty-message">No reviews yet</p>';
         return;
     }
     
-    try {
-        showLoading(true);
-        
-        // Mock API call - replace with actual endpoint
-        const reviewData = {
-            locationId: currentLocation.id,
-            rating: parseFloat(rating),
-            title,
-            body,
-            tags,
-            createdAt: new Date()
-        };
-        
-        // const response = await fetch(`${CONFIG.API_BASE_URL}/reviews`, {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(reviewData)
-        // });
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        showLoading(false);
-        closeModal('writeReviewModal');
-        
-        // Show success message
-        alert('Review submitted successfully!');
-        
-        // Reload reviews
-        loadTopReviews(currentLocation.id);
-    } catch (error) {
-        console.error('Error submitting review:', error);
-        showLoading(false);
-        alert('Failed to submit review. Please try again.');
-    }
-}
-
-// Geolocation
-function getUserLocation() {
-    if ('geolocation' in navigator) {
-        showLoading(true);
-        
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                currentUserPosition = [latitude, longitude];
-                
-                // Update user marker on static map
-                addUserMarker(currentUserPosition);
-                
-                // Update distance indicator
-                document.getElementById('userDistanceIndicator').innerHTML = `
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <circle cx="12" cy="12" r="10"/>
-                        <circle cx="12" cy="12" r="3" fill="currentColor"/>
-                    </svg>
-                    <span>Your Location</span>
-                `;
-                
-                // Recalculate distances and update places
-                updatePlacesDistances();
-                
-                showLoading(false);
-            },
-            (error) => {
-                console.error('Geolocation error:', error);
-                showLoading(false);
-                alert('Unable to get your location. Using USC campus as default.');
-            }
-        );
-    } else {
-        alert('Geolocation is not supported by your browser.');
-    }
-}
-
-// Update places distances based on user location
-function updatePlacesDistances() {
-    allPlaces.forEach(place => {
-        place.distance = calculateDistance(
-            currentUserPosition[0],
-            currentUserPosition[1],
-            place.lat,
-            place.lng
-        );
-    });
-    
-    displayPlaces(allPlaces);
-}
-
-// Calculate distance between two coordinates (Haversine formula)
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 3959; // Earth's radius in miles
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-    
-    return Math.round(distance * 100) / 100; // Round to 2 decimal places
-}
-
-function toRad(degrees) {
-    return degrees * (Math.PI / 180);
-}
-
-// Get directions
-function getDirections() {
-    if (!currentLocation) return;
-    
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${currentLocation.lat},${currentLocation.lng}`;
-    window.open(url, '_blank');
+    container.innerHTML = reviews.map(r => `
+        <div class="review-card">
+            <strong>${r.author || 'Anonymous'}</strong>
+            <div>${generateStars(r.rating)}</div>
+            <h4>${r.title}</h4>
+            <p>${r.body.substring(0, 200)}...</p>
+            <small>${formatDate(r.createdAt)}</small>
+        </div>
+    `).join('');
 }
 
 // Utility functions
-function formatDate(date) {
-    const now = new Date();
-    const reviewDate = new Date(date);
-    const diffTime = Math.abs(now - reviewDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
-}
-
-function truncateText(text, maxLength) {
-    if (text.length <= maxLength) return text;
-    return text.substr(0, maxLength) + '...';
+function formatDate(dateStr) {
+    try {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const days = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+        if (days === 0) return 'Today';
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days}d ago`;
+        if (days < 30) return `${Math.floor(days / 7)}w ago`;
+        return `${Math.floor(days / 30)}m ago`;
+    } catch { return ''; }
 }
 
 function showLoading(show) {
     const overlay = document.getElementById('loadingOverlay');
-    if (show) {
-        overlay.classList.add('active');
-    } else {
-        overlay.classList.remove('active');
+    if (overlay) overlay.classList.toggle('active', show);
+}
+
+function showError(msg) {
+    alert(msg);
+}
+
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
     }
 }
 
-function showError(message) {
-    alert(message); // In production, use a better error notification system
-}
-
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-function animatePlaceCards() {
-    const cards = document.querySelectorAll('.place-card');
-    cards.forEach((card, index) => {
-        card.style.animationDelay = `${index * 0.05}s`;
-    });
-}
-
-// Event Listeners Setup
+// Event listeners
 function setupEventListeners() {
-    // Locate button
-    document.getElementById('locateBtn').addEventListener('click', getUserLocation);
-    
-    // Sort select
-    document.getElementById('sortSelect').addEventListener('change', (e) => {
-        const sortBy = e.target.value;
-        let sortedPlaces = [...allPlaces];
-        
-        switch (sortBy) {
-            case 'distance':
-                sortedPlaces.sort((a, b) => a.distance - b.distance);
-                break;
-            case 'rating':
-                sortedPlaces.sort((a, b) => b.rating - a.rating);
-                break;
-            case 'popular':
-                // Sort by some popularity metric (mock)
-                sortedPlaces.sort((a, b) => b.rating - a.rating);
-                break;
-        }
-        
-        displayPlaces(sortedPlaces);
+    // Close modals
+    ['locationModal', 'reviewsModal'].forEach(id => {
+        const close = document.getElementById(id + 'Close');
+        const overlay = document.getElementById(id + 'Overlay');
+        if (close) close.addEventListener('click', () => closeModal(id));
+        if (overlay) overlay.addEventListener('click', () => closeModal(id));
     });
     
-    // Location modal
-    document.getElementById('modalClose').addEventListener('click', () => closeModal('locationModal'));
-    document.getElementById('modalOverlay').addEventListener('click', () => closeModal('locationModal'));
-    document.getElementById('allReviewsBtn').addEventListener('click', () => {
-        closeModal('locationModal');
-        showReviewsModal();
-    });
-    document.getElementById('writeReviewBtn').addEventListener('click', () => {
-        if (!window.currentUser) {
-            alert('Please login to write a review');
-            return;
-        }
-        closeModal('locationModal');
-        showWriteReviewModal();
-    });
-    document.getElementById('directionsBtn').addEventListener('click', getDirections);
-    
-    // Reviews modal
-    document.getElementById('reviewsModalClose').addEventListener('click', () => closeModal('reviewsModal'));
-    document.getElementById('reviewsModalOverlay').addEventListener('click', () => closeModal('reviewsModal'));
-    document.getElementById('reviewsSortSelect').addEventListener('change', (e) => {
-        loadAllReviews(currentLocation.id, 1, e.target.value, selectedTags);
-    });
-    
-    // Pagination
-    document.getElementById('prevPage').addEventListener('click', () => {
-        if (currentPage > 1) {
-            const sortBy = document.getElementById('reviewsSortSelect').value;
-            loadAllReviews(currentLocation.id, currentPage - 1, sortBy, selectedTags);
-        }
-    });
-    document.getElementById('nextPage').addEventListener('click', () => {
-        if (currentPage < totalPages) {
-            const sortBy = document.getElementById('reviewsSortSelect').value;
-            loadAllReviews(currentLocation.id, currentPage + 1, sortBy, selectedTags);
-        }
-    });
-    
-    // Login modal
-    document.getElementById('loginModalClose').addEventListener('click', () => closeModal('loginModal'));
-    document.getElementById('loginModalOverlay').addEventListener('click', () => closeModal('loginModal'));
-    document.getElementById('showRegisterBtn').addEventListener('click', showRegisterForm);
-    document.getElementById('showLoginBtn').addEventListener('click', showLoginForm);
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    document.getElementById('registerForm').addEventListener('submit', handleRegister);
-    
-    // Write review modal
-    document.getElementById('writeReviewModalClose').addEventListener('click', () => closeModal('writeReviewModal'));
-    document.getElementById('writeReviewModalOverlay').addEventListener('click', () => closeModal('writeReviewModal'));
-    document.getElementById('cancelReviewBtn').addEventListener('click', () => closeModal('writeReviewModal'));
-    
-    // Star input
-    document.querySelectorAll('.star-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const value = parseInt(btn.dataset.value);
-            document.getElementById('ratingInput').value = value;
-            
-            // Update visual state
-            document.querySelectorAll('.star-btn').forEach((star, index) => {
-                if (index < value) {
-                    star.classList.add('active');
-                } else {
-                    star.classList.remove('active');
-                }
-            });
-        });
-    });
-    
-    // Tag input
-    document.querySelectorAll('.tag-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            btn.classList.toggle('active');
-        });
-    });
-    
-    // Character count
-    const reviewBody = document.getElementById('reviewBody');
-    const charCount = document.getElementById('charCount');
-    reviewBody.addEventListener('input', () => {
-        charCount.textContent = reviewBody.value.length;
-    });
-    
-    // Review form submission
-    document.getElementById('reviewForm').addEventListener('submit', handleReviewSubmit);
-    
-    // Close modals on Escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
+    // View all reviews button
+    const allReviewsBtn = document.getElementById('allReviewsBtn');
+    if (allReviewsBtn) {
+        allReviewsBtn.addEventListener('click', () => {
             closeModal('locationModal');
-            closeModal('reviewsModal');
-            closeModal('writeReviewModal');
-            closeModal('loginModal');
-        }
-    });
+            showReviewsModal();
+        });
+    }
+    
+    // Write review button
+    const writeBtn = document.getElementById('writeReviewBtn');
+    if (writeBtn) {
+        writeBtn.addEventListener('click', () => {
+            if (!window.currentUser) {
+                alert('Please login to write a review');
+                return;
+            }
+            const loc = currentLocation;
+            window.location.href = `/foodlocator/jsp/write-review.jsp?locationId=${loc.id}&locationName=${encodeURIComponent(loc.name)}`;
+        });
+    }
+    
+    // Get Directions button
+    const directionsBtn = document.getElementById('directionsBtn');
+    if (directionsBtn) {
+        directionsBtn.addEventListener('click', () => {
+            if (currentLocation) {
+                getDirections(currentLocation);
+            }
+        });
+    }
+    
+    // Sort dropdown for places
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', (e) => {
+            sortPlaces(e.target.value);
+        });
+    }
+    
+    // Locate Me button
+    const locateBtn = document.getElementById('locateBtn');
+    if (locateBtn) {
+        locateBtn.addEventListener('click', locateMe);
+    }
 }
 
-// Export for testing (optional)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        calculateDistance,
-        formatDate,
-        truncateText,
-        generateStars
-    };
+function locateMe() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                const userLat = latitude;
+                const userLng = longitude;
+                
+                // Find nearest location
+                if (allPlaces.length > 0) {
+                    let nearest = allPlaces[0];
+                    let minDist = Math.sqrt(Math.pow(nearest.lat - userLat, 2) + Math.pow(nearest.lng - userLng, 2));
+                    
+                    allPlaces.forEach(place => {
+                        const dist = Math.sqrt(Math.pow(place.lat - userLat, 2) + Math.pow(place.lng - userLng, 2));
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearest = place;
+                        }
+                    });
+                    
+                    showLocationModal(nearest);
+                }
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                showError('Could not get your location');
+            }
+        );
+    } else {
+        showError('Geolocation not supported');
+    }
+}
+
+function getDirections(place) {
+    if (!place) return;
+    // Open Google Maps with directions
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}&travelmode=walking`;
+    window.open(mapsUrl, '_blank');
+}
+
+// Show all reviews
+async function showReviewsModal() {
+    if (!currentLocation) return;
+    
+    document.getElementById('reviewsModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('reviewsLocationName').textContent = currentLocation.name;
+    document.getElementById('reviewsRating').textContent = currentLocation.rating.toFixed(1);
+    document.getElementById('reviewsStars').innerHTML = generateStars(currentLocation.rating);
+    
+    // Setup sort listener
+    const sortSelect = document.getElementById('reviewsSortSelect');
+    if (sortSelect) {
+        sortSelect.removeEventListener('change', handleSortChange);
+        sortSelect.addEventListener('change', handleSortChange);
+    }
+    
+    loadAllReviews(currentLocation.id, 1, 'recent');
+}
+
+async function handleSortChange(e) {
+    if (currentLocation) {
+        loadAllReviews(currentLocation.id, 1, e.target.value);
+    }
+}
+
+async function loadAllReviews(locationId, page = 1, sortBy = 'recent') {
+    try {
+        const response = await fetch(
+            `${CONFIG.API_BASE_URL}/reviews/${locationId}?page=${page}&pageSize=10&sortBy=${sortBy}`,
+            { credentials: 'include' }
+        );
+        const result = await response.json();
+        const reviews = result.success && result.data && result.data.reviews ? result.data.reviews : [];
+        totalReviews = result.data?.totalReviews || 0;
+        totalPages = result.data?.totalPages || 1;
+        currentPage = page;
+        
+        // Update review count
+        document.getElementById('reviewsCount').textContent = `${totalReviews} review${totalReviews !== 1 ? 's' : ''}`;
+        
+        displayAllReviews(reviews);
+        updatePagination();
+    } catch (error) {
+        console.error('Error:', error);
+        displayAllReviews([]);
+    }
+}
+
+function displayAllReviews(reviews) {
+    const container = document.getElementById('reviewsList');
+    if (!container) return;
+    
+    if (reviews.length === 0) {
+        container.innerHTML = '<p class="empty-message">No reviews yet</p>';
+        return;
+    }
+    
+    container.innerHTML = reviews.map(r => `
+        <div class="review-card">
+            <div class="review-header">
+                <div>
+                    <strong>${r.author || 'Anonymous'}</strong>
+                    <small>${formatDate(r.createdAt)}</small>
+                </div>
+                <div>${generateStars(r.rating)}</div>
+            </div>
+            <h4>${r.title}</h4>
+            <p>${r.body}</p>
+        </div>
+    `).join('');
+}
+
+function updatePagination() {
+    const pagination = document.getElementById('reviewsPagination');
+    if (!pagination) return;
+    
+    // Hide pagination if only 1 page
+    if (totalPages <= 1) {
+        pagination.style.display = 'none';
+        return;
+    }
+    
+    pagination.style.display = 'flex';
+    
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
+    
+    if (prevBtn) {
+        prevBtn.disabled = currentPage <= 1;
+        prevBtn.removeEventListener('click', handlePrevPage);
+        prevBtn.addEventListener('click', handlePrevPage);
+    }
+    
+    if (nextBtn) {
+        nextBtn.disabled = currentPage >= totalPages;
+        nextBtn.removeEventListener('click', handleNextPage);
+        nextBtn.addEventListener('click', handleNextPage);
+    }
+}
+
+function handlePrevPage() {
+    if (currentPage > 1 && currentLocation) {
+        const sortBy = document.getElementById('reviewsSortSelect')?.value || 'recent';
+        loadAllReviews(currentLocation.id, currentPage - 1, sortBy);
+    }
+}
+
+function handleNextPage() {
+    if (currentPage < totalPages && currentLocation) {
+        const sortBy = document.getElementById('reviewsSortSelect')?.value || 'recent';
+        loadAllReviews(currentLocation.id, currentPage + 1, sortBy);
+    }
 }
