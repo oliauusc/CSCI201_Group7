@@ -4,10 +4,10 @@
 const CONFIG = {
     USC_CENTER: [34.0224, -118.2851],
     MAP_BOUNDS: {
-        north: 34.0280,
-        south: 34.0200,
-        east: -118.2820,
-        west: -118.2880
+        north: 34.0281,
+        south: 34.0155,
+        east: -118.2712,
+        west: -118.2973
     },
     API_BASE_URL: '/foodlocator/api'
 };
